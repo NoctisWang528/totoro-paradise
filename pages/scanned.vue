@@ -4,6 +4,7 @@ import TotoroApiWrapper from '~/src/wrappers/TotoroApiWrapper';
 const sunrunPaper = useSunRunPaper();
 const session = useSession();
 const selectValue = ref('');
+const runPreferences = useRunPreferences();
 const data = await TotoroApiWrapper.getSunRunPaper({
   token: session.value.token,
   campusId: session.value.campusId,
@@ -19,6 +20,67 @@ watchEffect(() => {
 const handleUpdate = (target: string) => {
   selectValue.value = target;
 };
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const defaultDistance = computed(() => {
+  if (!data) return 3.2;
+  const parsed = Number.parseFloat(String(data.mileage ?? ''));
+  if (Number.isFinite(parsed)) return clamp(parsed, 3.2, 4.0);
+  return 3.2;
+});
+
+const defaultDuration = computed(() => {
+  if (!data) return 20;
+  const minTime = Number.parseFloat(String(data.minTime ?? ''));
+  const maxTime = Number.parseFloat(String(data.maxTime ?? ''));
+  if (Number.isFinite(minTime) && Number.isFinite(maxTime)) {
+    return clamp((minTime + maxTime) / 2, 15, 25);
+  }
+  if (Number.isFinite(minTime)) return clamp(minTime, 15, 25);
+  if (Number.isFinite(maxTime)) return clamp(maxTime, 15, 25);
+  return 20;
+});
+
+if (runPreferences.value.distanceKm === null) {
+  runPreferences.value.distanceKm = defaultDistance.value;
+}
+
+if (runPreferences.value.durationMin === null) {
+  runPreferences.value.durationMin = defaultDuration.value;
+}
+
+const distanceValue = ref(runPreferences.value.distanceKm ?? defaultDistance.value);
+const durationValue = ref(runPreferences.value.durationMin ?? defaultDuration.value);
+
+watch(distanceValue, (val) => {
+  runPreferences.value.distanceKm = clamp(val, 3.2, 4.0);
+});
+
+watch(durationValue, (val) => {
+  runPreferences.value.durationMin = clamp(val, 15, 25);
+});
+
+watch(
+  () => runPreferences.value.distanceKm,
+  (val) => {
+    if (val !== null) {
+      distanceValue.value = clamp(val, 3.2, 4.0);
+    }
+  },
+);
+
+watch(
+  () => runPreferences.value.durationMin,
+  (val) => {
+    if (val !== null) {
+      durationValue.value = clamp(val, 15, 25);
+    }
+  },
+);
+
+const distanceLabel = computed(() => `${distanceValue.value.toFixed(2)} km`);
+const durationLabel = computed(() => `${durationValue.value.toFixed(1)} 分钟`);
 </script>
 <template>
   <p>请核对个人信息</p>
@@ -52,6 +114,37 @@ const handleUpdate = (target: string) => {
       label="路线"
       class="mt-2"
     />
+    <VDivider class="my-4" />
+    <div class="flex flex-col gap-6">
+      <div>
+        <div class="mb-2 flex items-center justify-between">
+          <span class="text-body-2">自定义路线长度</span>
+          <span class="text-body-2 text-medium-emphasis">{{ distanceLabel }}</span>
+        </div>
+        <VSlider
+          v-model="distanceValue"
+          :min="3.2"
+          :max="4.0"
+          :step="0.1"
+          thumb-label="always"
+          color="primary"
+        />
+      </div>
+      <div>
+        <div class="mb-2 flex items-center justify-between">
+          <span class="text-body-2">自定义预计耗时</span>
+          <span class="text-body-2 text-medium-emphasis">{{ durationLabel }}</span>
+        </div>
+        <VSlider
+          v-model="durationValue"
+          :min="15"
+          :max="25"
+          :step="0.5"
+          thumb-label="always"
+          color="primary"
+        />
+      </div>
+    </div>
     <div class="flex gap-4">
       <VBtn
         variant="outlined"

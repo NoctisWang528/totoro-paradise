@@ -31,15 +31,18 @@ const generateRunReq = async ({
   minTime: string;
   maxTime: string;
 }) => {
-  const { minSecond, maxSecond } = {
-    minSecond: Number(minTime) * 60,
-    maxSecond: Number(maxTime) * 60,
-  };
-  const avgSecond = minSecond + maxSecond / 2;
-  /** 正态分布，以最短和最长用时的平均值为平均值，以 1/2 区间的 1/3 为标准差 */
-  const waitSecond = Math.floor(
-    normalRandom(minSecond + maxSecond / 2, (maxSecond - avgSecond) / 3),
-  );
+  const minSecond = Math.floor(Number(minTime) * 60);
+  const maxSecond = Math.floor(Number(maxTime) * 60);
+  const clamp = (value: number, minValue: number, maxValue: number) =>
+    Math.min(Math.max(value, minValue), maxValue);
+  const lowerBound = Math.min(minSecond, maxSecond);
+  const upperBound = Math.max(minSecond, maxSecond);
+  const midpoint = (lowerBound + upperBound) / 2;
+  const deviation = Math.max((upperBound - lowerBound) / 6, 1);
+  const waitSecond =
+    lowerBound === upperBound
+      ? lowerBound
+      : Math.floor(clamp(normalRandom(midpoint, deviation), lowerBound, upperBound));
   const startTime = new Date();
   const endTime = new Date(Number(startTime) + waitSecond * 1000);
   const distanceNum = Number(distance);

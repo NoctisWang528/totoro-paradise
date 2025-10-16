@@ -12,22 +12,55 @@ const timePassed = computed(() => Number(now.value) - Number(startTime.value));
 const needTime = ref(0);
 const running = ref(false);
 const sunRunPaper = useSunRunPaper();
+const runPreferences = useRunPreferences();
 const { params } = useRoute();
 const session = useSession();
 const { route } = params as { route: string };
 const runned = computed(() => !running.value && !!needTime.value);
 const target = computed(() => sunRunPaper.value.runPointList.find((r) => r.pointId === route)!);
+const fallbackDistance = computed(() => Number.parseFloat(String(sunRunPaper.value.mileage ?? '0')));
+const fallbackMinTime = computed(() => Number.parseFloat(String(sunRunPaper.value.minTime ?? '0')));
+const fallbackMaxTime = computed(() => Number.parseFloat(String(sunRunPaper.value.maxTime ?? '0')));
+
+const selectedDistance = computed(() => {
+  const preferred = runPreferences.value.distanceKm;
+  if (preferred !== null) {
+    return preferred;
+  }
+  const fallback = fallbackDistance.value;
+  return Number.isFinite(fallback) && fallback > 0 ? fallback : 3.2;
+});
+
+const selectedDuration = computed(() => {
+  const preferred = runPreferences.value.durationMin;
+  if (preferred !== null) {
+    return preferred;
+  }
+  const minTime = fallbackMinTime.value;
+  const maxTime = fallbackMaxTime.value;
+  if (Number.isFinite(minTime) && Number.isFinite(maxTime) && maxTime > 0) {
+    return (minTime + maxTime) / 2;
+  }
+  if (Number.isFinite(minTime) && minTime > 0) return minTime;
+  if (Number.isFinite(maxTime) && maxTime > 0) return maxTime;
+  return 20;
+});
+
+const distanceForRequest = computed(() => selectedDistance.value.toFixed(2));
+const durationForRequest = computed(() => selectedDuration.value.toFixed(2));
+const durationLabel = computed(() => `${selectedDuration.value.toFixed(1)} 分钟`);
+const distanceLabel = computed(() => `${selectedDistance.value.toFixed(2)} km`);
 const handleRun = async () => {
   const { req, endTime: targetTime } = await generateRunReq({
-    distance: sunRunPaper.value.mileage,
+    distance: distanceForRequest.value,
     routeId: target.value.pointId,
     taskId: target.value.taskId,
     token: session.value.token,
     schoolId: session.value.schoolId,
     stuNumber: session.value.stuNumber,
     phoneNumber: session.value.phoneNumber,
-    minTime: sunRunPaper.value.minTime,
-    maxTime: sunRunPaper.value.maxTime,
+    minTime: durationForRequest.value,
+    maxTime: durationForRequest.value,
   });
   startTime.value = now.value;
   needTime.value = Number(targetTime) - Number(now.value);
@@ -42,7 +75,7 @@ const handleRun = async () => {
   });
   setTimeout(async () => {
     const res = await TotoroApiWrapper.sunRunExercises(req);
-    const runRoute = generateRoute(sunRunPaper.value.mileage, target.value);
+    const runRoute = generateRoute(distanceForRequest.value, target.value);
     await TotoroApiWrapper.sunRunExercisesDetail({
       pointList: runRoute.mockRoute,
       scantronId: res.scantronId,
@@ -74,7 +107,9 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
 </script>
 <template>
   <p class="text-body-1">已选择路径 {{ target.pointName }}</p>
-  <p class="text-body-1 mt-2">请再次确认是否开跑</p>
+  <p class="text-body-2 mt-2">预计里程：{{ distanceLabel }}</p>
+  <p class="text-body-2 mt-1">预计耗时：{{ durationLabel }}</p>
+  <p class="text-body-1 mt-4">请再次确认是否开跑</p>
   <p class="text-body-1 mt-2">开跑时会向龙猫服务器发送请求，所以请尽量不要在开跑后取消</p>
   <VBtn v-if="!runned && !running" color="primary my-4" append-icon="i-mdi-run" @click="handleRun">
     确认开跑

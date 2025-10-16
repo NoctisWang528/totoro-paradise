@@ -16,7 +16,7 @@ window.global = window;
       <VAppBarTitle>龙猫乐园</VAppBarTitle>
       <template #append>
         <VAppBarNavIcon
-          v-ripple icon="i-mdi-github" href="https://github.com/BeiyanYunyi/totoro-paradise"
+          v-ripple icon="i-mdi-github" href="https://github.com/NoctisWang528/totoro-paradise"
           rel="noreferrer noopener" target="_blank"
         />
       </template>
